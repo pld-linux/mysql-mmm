@@ -4,7 +4,7 @@
 Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
 Version:	2.2.1
-Release:	0.3
+Release:	0.4
 License:	GPL v2
 Group:		Applications/System
 URL:		http://www.mysql-mmm.org/
@@ -159,7 +159,8 @@ fi
 %dir %{_sysconfdir}/mysql-mmm
 %config(noreplace) %verify(not md5 mtime size) /etc/logrotate.d/mysql-mmm
 %attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_common.conf
-%{perl_vendorlib}/MMM/Common
+%dir %{perl_vendorlib}/MMM
+%dir %{perl_vendorlib}/MMM/Common
 %dir %{_libdir}/%{name}
 
 %dir %{_localstatedir}/lib/mysql-mmm
