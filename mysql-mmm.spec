@@ -4,7 +4,7 @@
 Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
 Version:	2.2.1
-Release:	0.2
+Release:	0.3
 License:	GPL v2
 Group:		Applications/System
 URL:		http://www.mysql-mmm.org/
@@ -160,6 +160,7 @@ fi
 %config(noreplace) %verify(not md5 mtime size) /etc/logrotate.d/mysql-mmm
 %attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_common.conf
 %{perl_vendorlib}/MMM/Common
+%dir %{_libdir}/%{name}
 
 %dir %{_localstatedir}/lib/mysql-mmm
 %dir %{_localstatedir}/run/mysql-mmm
@@ -173,7 +174,9 @@ fi
 %attr(755,root,root) %{_sbindir}/mmm_clone
 %attr(755,root,root) %{_sbindir}/mmm_restore
 %{perl_vendorlib}/MMM/Tools
-%{_libdir}/%{name}/tools
+%dir %{_libdir}/%{name}/tools
+%attr(755,root,root) %{_libdir}/%{name}/tools/create_snapshot
+%attr(755,root,root) %{_libdir}/%{name}/tools/remove_snapshot
 
 %files agent
 %defattr(644,root,root,755)
@@ -183,7 +186,17 @@ fi
 %attr(754,root,root) /etc/rc.d/init.d/mysql-mmm-agent
 %attr(755,root,root) %{_sbindir}/mmm_agentd
 %{perl_vendorlib}/MMM/Agent
-%{_libdir}/%{name}/agent
+%dir %{_libdir}/%{name}/agent
+%attr(755,root,root) %{_libdir}/%{name}/agent/check_ip
+%attr(755,root,root) %{_libdir}/%{name}/agent/clear_ip
+%attr(755,root,root) %{_libdir}/%{name}/agent/configure_ip
+%attr(755,root,root) %{_libdir}/%{name}/agent/mysql_allow_write
+%attr(755,root,root) %{_libdir}/%{name}/agent/mysql_deny_write
+%attr(755,root,root) %{_libdir}/%{name}/agent/mysql_may_write
+%attr(755,root,root) %{_libdir}/%{name}/agent/set_active_master
+%attr(755,root,root) %{_libdir}/%{name}/agent/sync_with_master
+%attr(755,root,root) %{_libdir}/%{name}/agent/turn_off_slave
+%attr(755,root,root) %{_libdir}/%{name}/agent/turn_on_slave
 
 %files monitor
 %defattr(644,root,root,755)
@@ -195,4 +208,5 @@ fi
 %attr(755,root,root) %{_sbindir}/mmm_mond
 %attr(755,root,root) %{_sbindir}/mmm_control
 %{perl_vendorlib}/MMM/Monitor
-%{_libdir}/%{name}/monitor
+%dir %{_libdir}/%{name}/monitor
+%attr(755,root,root) %{_libdir}/%{name}/monitor/checker
