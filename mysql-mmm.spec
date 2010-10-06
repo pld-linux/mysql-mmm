@@ -56,7 +56,6 @@ the monitoring node with a simple set of remote services.
 Summary:	MMM Monitor Server Daemon and Libraries
 Group:		Applications/System
 Requires:	%{name} = %{version}-%{release}
-Requires:	perl(Class::Singleton)
 Requires:	perl(DBD::mysql)
 Obsoletes:	mmm-monitor
 Obsoletes:	mysql-master-master-monitor
