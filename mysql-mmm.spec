@@ -1,3 +1,5 @@
+# TODO
+# - implement clusters in pld way
 Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
 Version:	2.2.1
@@ -130,7 +132,7 @@ if [ "$1" -eq 1 ]; then
 	/sbin/chkconfig --add mysql-mmm-agent
 	/sbin/chkconfig mysql-mmm-agent off
 elif [ "$1" -ge 2 ]; then
-	%service mysql-mmm-agent condrestart
+	%service mysql-mmm-agent try-restart
 fi
 
 %post monitor
@@ -138,7 +140,7 @@ if [ "$1" -eq 1 ]; then
 	/sbin/chkconfig --add mysql-mmm-monitor
 	/sbin/chkconfig mysql-mmm-monitor off
 elif [ "$1" -ge 2 ]; then
-	%service mysql-mmm-monitor condrestart
+	%service mysql-mmm-monitor try-restart
 fi
 
 %preun agent

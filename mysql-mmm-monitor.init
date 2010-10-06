@@ -3,84 +3,146 @@
 # mysql-mmm-monitor  This shell script takes care of starting and stopping
 #                    the mmm monitoring daemon.
 #
-# chkconfig: - 64 36
-# description:  MMM Monitor.
+# chkconfig:	- 64 36
+# description: MMM Monitor.
 # processname: mmm_mond
 # config: /etc/mysql-mmm/mmm_mon.conf
 # pidfile: /var/run/mysql-mmm/mmm_mond.pid
+#
+# $Id$
 
-# Source function library and defaults file.
+# Source function library
 . /etc/rc.d/init.d/functions
-. /etc/default/mysql-mmm-monitor
 
-# Cluster name (it can be empty for default cases)
-CLUSTER=''
-LOCKFILE='/var/lock/subsys/mysql-mmm-monitor'
-prog='MMM Monitor Daemon'
+# Get network config
+. /etc/sysconfig/network
 
-if [ "$CLUSTER" != "" ]; then
-        MMMD_MON_BIN="/usr/sbin/mmm_mond @$CLUSTER"
-        MMMD_MON_PIDFILE="/var/run/mysql-mmm/mmm_mond-$CLUSTER.pid"
-else 
-        MMMD_MON_BIN="/usr/sbin/mmm_mond"
-        MMMD_MON_PIDFILE="/var/run/mysql-mmm/mmm_mond.pid"
+# Check that networking is up.
+if is_yes "${NETWORKING}"; then
+	if [ ! -f /var/lock/subsys/network -a "$1" != stop -a "$1" != status ]; then
+		msg_network_down "MMM Monitor Daemon"
+		exit 1
+	fi
+else
+	exit 0
 fi
 
+# Set defaults
+# Cluster name (it can be empty for default cases)
+# FIXME: not implemented properly yet
+CLUSTER=""
+
+# Get service config - may override defaults
+[ -f /etc/sysconfig/mysql-mmm-monitor ] && . /etc/sysconfig/mysql-mmm-monitor
+
+# configtest itself
+# must return non-zero if check failed
+# output is discarded if checkconfig is ran without details
+configtest() {
+	if ! is_yes "${ENABLED}"; then
+		echo "MMM Monitor Daemon is disabled!"
+		return 1
+	fi
+	return 0
+}
+
+# wrapper for configtest
+checkconfig() {
+	local details=${1:-0}
+
+	if [ $details = 1 ]; then
+		# run config test and display report (status action)
+		show "Checking %s configuration" "MMM Monitor Daemon"; busy
+		local out
+		out=$(configtest 2>&1)
+		RETVAL=$?
+		if [ $RETVAL = 0 ]; then
+			ok
+		else
+			fail
+		fi
+		[ "$out" ] && echo >&2 "$out"
+	else
+		# run config test and abort with nice message if failed
+		# (for actions checking status before action).
+		configtest >/dev/null 2>&1
+		RETVAL=$?
+		if [ $RETVAL != 0 ]; then
+			show "Checking %s configuration" "MMM Monitor Daemon"; fail
+			nls 'Configuration test failed. See details with %s "checkconfig"' $0
+			exit $RETVAL
+		fi
+	fi
+}
+
 start() {
-        if [ "${ENABLED}" != "1" ]; then
-                echo "$prog is disabled!"
-                exit 1
-        fi
-        echo -n "Starting $prog: "
-        if [ -s $MMMD_MON_PIDFILE ] && kill -0 `cat $MMMD_MON_PIDFILE` 2> /dev/null; then
-            echo " already running."
-            exit 0
-        fi
-        daemon $MMMD_MON_BIN
-        RETVAL=$?
-        echo
-        [ $RETVAL = 0 ] && touch $LOCKFILE
-        return $RETVAL
+	# Check if the service is already running?
+	if [ -f /var/lock/subsys/mysql-mmm-monitor ]; then
+		msg_already_running "MMM Monitor Daemon"
+		return
+	fi
+
+	checkconfig
+	msg_starting "MMM Monitor Daemon"
+	daemon /usr/sbin/mmm_mond
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/mysql-mmm-monitor
 }
 
 stop() {
-        # Stop daemon.
-        echo -n "Stopping $prog: "
-        killproc -p $MMMD_MON_PIDFILE $MMMD_MON_BIN
-        RETVAL=$?
-        echo
-        [ $RETVAL = 0 ] && rm -f $LOCKFILE
-        return $RETVAL
+	if [ ! -f /var/lock/subsys/mysql-mmm-monitor ]; then
+		msg_not_running "MMM Monitor Daemon"
+		return
+	fi
+
+	# Stop daemons.
+	msg_stopping "MMM Monitor Daemon"
+	killproc --pidfile /var/run/mysql-mmm-monitor.pid mmm_mond -TERM
+	rm -f /var/lock/subsys/mysql-mmm-monitor
 }
 
+condrestart() {
+	if [ ! -f /var/lock/subsys/mysql-mmm-monitor ]; then
+		msg_not_running "MMM Monitor Daemon"
+		RETVAL=$1
+		return
+	fi
+
+	checkconfig
+	stop
+	start
+}
+
+RETVAL=0
+# See how we were called.
 case "$1" in
   start)
-        start
-        ;;
-
+	start
+	;;
   stop)
-        stop
-        ;;
-
+	stop
+	;;
+  restart)
+	checkconfig
+	stop
+	start
+	;;
+  try-restart)
+	condrestart 0
+	;;
+  force-reload)
+	condrestart 7
+	;;
+  checkconfig|configtest)
+	checkconfig 1
+	;;
   status)
-        status -p $MMMD_MON_PIDFILE $MMMD_MON_BIN
-        RETVAL=$?
-        ;;
-
-  restart|reload)
-        stop
-        start
-        ;;
-
-  condrestart)
-        if [ -f $LOCKFILE ]; then
-                stop
-                start
-        fi
-        ;;
+	status --pidfile /var/run/mysql-mmm-monitor.pid mysql-mmm-monitor mmm_mond
+	RETVAL=$?
+	;;
   *)
-        echo "Usage: $0 {start|stop|restart|condrestart|status}"
-        ;;
+	msg_usage "$0 {start|stop|restart|try-restart|force-reload|checkconfig|status}"
+	exit 3
 esac
 
-exit $RETVAL 
+exit $RETVAL
