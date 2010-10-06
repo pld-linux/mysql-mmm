@@ -19,7 +19,6 @@ Source6:	mmm_agent.conf
 Source7:	mmm_mon.conf
 Source8:	mmm_tools.conf
 Source9:	mmm_common.conf
-Patch0:		%{name}-paths.patch
 Obsoletes:	mmm
 Obsoletes:	mysql-master-master
 BuildArch:	noarch
@@ -77,7 +76,6 @@ processes by com- mands.
 
 %prep
 %setup -q
-%patch0 -p1
 cp -a %{SOURCE1} %{name}-%{version}.pdf
 
 grep -rl /usr/bin/env bin sbin | xargs %{__sed} -i -e '1s,^#!.*perl,#!%{__perl},'
@@ -92,7 +90,6 @@ EOF
 %install
 rm -rf $RPM_BUILD_ROOT
 %{__make} install \
-	BINDIR='$(DESTDIR)/%{_libdir}/%{name}' \
 	DESTDIR=$RPM_BUILD_ROOT
 
 # additional
