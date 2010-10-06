@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# mysql-mmm-agent    This shell script takes care of starting and stopping
+#                    the mmm agent daemon.
+#
+# chkconfig: - 64 36
+# description:  MMM Agent.
+# processname: mmm_agentd
+# config: /etc/mysql-mmm/mmm_agent.conf
+# pidfile: /var/run/mysql-mmm/mmm_agentd.pid
+
+# Source function library and defaults file.
+. /etc/rc.d/init.d/functions
+. /etc/default/mysql-mmm-agent
+
+# Paths
+MMMD_AGENT_BIN="/usr/sbin/mmm_agentd"
+MMMD_AGENT_PIDFILE="/var/run/mysql-mmm/mmm_agentd.pid"
+LOCKFILE='/var/lock/subsys/mysql-mmm-agent'
+prog='MMM Agent Daemon'
+
+
+start() {
+        if [ "${ENABLED}" != "1" ]; then
+                echo "$prog is disabled!"
+                exit 1
+        fi
+
+        echo -n "Starting $prog: "
+        if [ -s $MMMD_AGENT_PIDFILE ] && kill -0 `cat $MMMD_AGENT_PIDFILE` 2> /dev/null; then
+            echo " already running."
+            exit 0
+        fi
+        daemon $MMMD_AGENT_BIN
+        RETVAL=$?
+        echo
+	[ $RETVAL = 0 ] && touch $LOCKFILE
+        return $RETVAL
+}
+
+stop() {
+        # Stop daemon.
+        echo -n "Stopping $prog: "
+        killproc -p $MMMD_AGENT_PIDFILE $MMMD_AGENT_BIN
+        RETVAL=$?
+        echo
+        [ $RETVAL = 0 ] && rm -f $LOCKFILE
+        return $RETVAL
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+
+  stop)
+        stop
+        ;;
+
+  status)
+        status -p $MMMD_AGENT_PIDFILE $MMMD_AGENT_BIN
+        RETVAL=$?
+        ;;
+
+  restart|reload)
+        stop
+        start
+        ;;
+
+  condrestart)
+        if [ -f $LOCKFILE ]; then
+                stop
+                start
+        fi
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|restart|condrestart|status}"
+        ;;
+esac
+
+exit $RETVAL 

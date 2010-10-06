@@ -1,0 +1,11 @@
+--- mysql-mmm-2.1.0/Makefile.orig	2010-02-18 09:49:25.000000000 -0600
++++ mysql-mmm-2.1.0/Makefile	2010-02-22 18:10:53.000000000 -0600
+@@ -4,7 +4,7 @@
+ endif
+ 
+ MODULEDIR = $(DESTDIR)$(shell eval "`perl -V:${INSTALLDIR}`"; echo "$$${INSTALLDIR}")/MMM
+-BINDIR    = $(DESTDIR)/usr/lib/mysql-mmm
++BINDIR    = $(DESTDIR)/usr/libexec/mysql-mmm
+ SBINDIR   = $(DESTDIR)/usr/sbin
+ LOGDIR    = $(DESTDIR)/var/log/mysql-mmm
+ ETCDIR    = $(DESTDIR)/etc

@@ -1,23 +1,29 @@
-# TODO
-# - find source for bundled 32bit elfs: bin/sys/*
-# - pldize initscript, logrotate, etc
-%include	/usr/lib/rpm/macros.perl
-Summary:	MySQL Master-Master Replication Manager
+Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
-Version:	1.2.3
+Version:	2.2.1
 Release:	0.1
 License:	GPL v2
 Group:		Applications/System
-Source0:	http://mysql-master-master.googlecode.com/files/mysql-master-master-%{version}.tar.gz
-# Source0-md5:	2d0492222441ddae061a84bbfe23777a
-BuildRequires:	rpm-perlprov >= 4.1-13
-BuildRequires:	sed >= 4.0
-Requires(post,preun):	/sbin/chkconfig
-Requires:	rc-scripts
+URL:		http://www.mysql-mmm.org/
+Source0:	http://mysql-mmm.org/_media/mmm2:%{name}-%{version}.tar.gz
+# Source0-md5:	f5f8b48bdf89251d3183328f0249461e
+Source1:	http://mysql-mmm.org/_media/mmm2:%{name}-%{version}.pdf
+# Source1-md5:	180dbb5662fd66291d01913e0fe34842
+Source2:	%{name}.logrotate
+Source3:	%{name}-agent.init
+Source4:	%{name}-monitor.init
+Source5:	mmm_mon_log.conf
+Source6:	mmm_agent.conf
+Source7:	mmm_mon.conf
+Source8:	mmm_tools.conf
+Source9:	mmm_common.conf
+Patch0:		%{name}-paths.patch
+Obsoletes:	mmm
+Obsoletes:	mysql-master-master
 BuildArch:	noarch
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
-%define		_appdir		%{_datadir}/%{name}
+%define		_libdir		%{_prefix}/lib
 
 %description
 MMM (MySQL Master-Master Replication Manager) is a set of flexible
@@ -26,126 +32,167 @@ Master-Master replication configurations (with only one node writable
 at any time). The toolset also has the ability to read balance
 standard master/slave configurations with any number of slaves, so you
 can use it to move virtual IP addresses around a group of servers
-depending on whether they are behind in replication.
+depending on whether they are behind in replication. In addition to
+that, it also has scripts for data backups, resynchronization between
+nodes etc.
+
+%package agent
+Summary:	MMM Database Server Agent Daemon and Libraries
+Group:		Applications/System
+Requires:	%{name} = %{version}-%{release}
+Requires:	iproute2
+Requires:	perl-DBD-mysql
+Obsoletes:	mmm-agent
+Obsoletes:	mysql-master-master-agent
+
+%description agent
+Agent daemon and libraries which run on each MySQL server and provides
+the monitoring node with a simple set of remote services.
+
+%package monitor
+Summary:	MMM Monitor Server Daemon and Libraries
+Group:		Applications/System
+Requires:	%{name} = %{version}-%{release}
+Requires:	perl(Class::Singleton)
+Requires:	perl(DBD::mysql)
+Obsoletes:	mmm-monitor
+Obsoletes:	mysql-master-master-monitor
+
+%description monitor
+Monitoring daemon and libraries that do all monitoring work and make
+all decisions about roles moving and so on.
+
+%package tools
+Summary:	MMM Control Scripts and Libraries
+Group:		Applications/System
+Requires:	%{name} = %{version}-%{release}
+Obsoletes:	mmm-tools
+Obsoletes:	mysql-master-master-tools
+
+%description tools
+Scripts and libraries dedicated to management of the mmmd_mon
+processes by com- mands.
 
 %prep
-%setup -q -n mysql-master-master-%{version}
+%setup -q
+%patch0 -p1
+cp -a %{SOURCE1} %{name}-%{version}.pdf
 
 grep -rl /usr/bin/env bin sbin | xargs %{__sed} -i -e '1s,^#!.*perl,#!%{__perl},'
 
+# currently the README included with mysql-mmm is zero-length
+cat >> README <<EOF
+Full documentation can be found at:
+
+    %{_docdir}/%{name}-%{version}/%{name}-%{version}.pdf
+EOF
+
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/etc/{rc.d/init.d,logrotate.d}
-./install.pl \
-	--prefix=$RPM_BUILD_ROOT%{_appdir} \
-	--sbin-dir=$RPM_BUILD_ROOT%{_sbindir} \
-	--man-dir=$RPM_BUILD_ROOT%{_mandir} \
-	--skip-checks
+%{__make} install \
+	BINDIR='$(DESTDIR)/%{_libdir}/%{name}' \
+	DESTDIR=$RPM_BUILD_ROOT
 
-# Install init scripts and logrotate conf
-install -p scripts/init.d/mmm_agent $RPM_BUILD_ROOT/etc/rc.d/init.d/mmm_agent
-install -p scripts/init.d/mmm_mon $RPM_BUILD_ROOT/etc/rc.d/init.d/mmm_mon
-cp -a scripts/logrotate.d/mmm $RPM_BUILD_ROOT/etc/logrotate.d/mmm
+# additional
+install -d $RPM_BUILD_ROOT{/etc/{rc.d/init.d,sysconfig,logrotate.d},%{_localstatedir}/{run,lib}/%{name}}
+cp -a %{SOURCE2} $RPM_BUILD_ROOT/etc/logrotate.d/mysql-mmm
 
-# fix symlinks
-for a in $RPM_BUILD_ROOT%{_sbindir}/*; do
-	l=$(readlink $a)
-	l=../${l#$RPM_BUILD_ROOT%{_prefix}/}
-	ln -sf $l $a
-done
+# Replace config files
+cp -a %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/mmm_mon_log.conf
+cp -a %{SOURCE6} $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/mmm_agent.conf
+cp -a %{SOURCE7} $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/mmm_mon.conf
+cp -a %{SOURCE8} $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/mmm_tools.conf
+cp -a %{SOURCE9} $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/mmm_common.conf
 
-# relocate manuals
-install -d $RPM_BUILD_ROOT%{_mandir}/man1
-mv $RPM_BUILD_ROOT%{_appdir}/man/man1/* $RPM_BUILD_ROOT%{_mandir}/man1
+# Replace our init scripts
+rm -f $RPM_BUILD_ROOT%{_sysconfdir}/init.d/*
+install -p %{SOURCE3} $RPM_BUILD_ROOT/etc/rc.d/init.d/mysql-mmm-agent
+install -p %{SOURCE4} $RPM_BUILD_ROOT/etc/rc.d/init.d/mysql-mmm-monitor
 
-# relocate examples
-install -d $RPM_BUILD_ROOT%{_examplesdir}/%{name}-%{version}
-for a in $RPM_BUILD_ROOT%{_appdir}%{_sysconfdir}/examples/*; do
-	mv $a $RPM_BUILD_ROOT%{_examplesdir}/%{name}-%{version}/$(basename $a .example)
-done
+# Create defaults files
+install -d $RPM_BUILD_ROOT%{_sysconfdir}/default
 
-# bundled 32bit ELF
-rm -f $RPM_BUILD_ROOT%{_appdir}/bin/sys/*
+cat > $RPM_BUILD_ROOT/etc/sysconfig/mysql-mmm-agent <<EOF
+# mysql-mmm-agent defaults
+ENABLED=1
+EOF
 
-# Remove unpackaged files/dirs
-rm -f $RPM_BUILD_ROOT%{_appdir}/debug*.list
-rm -r $RPM_BUILD_ROOT%{_appdir}/scripts \
-       $RPM_BUILD_ROOT%{_appdir}/install.pl \
-       $RPM_BUILD_ROOT%{_appdir}/contrib \
-       $RPM_BUILD_ROOT%{_appdir}/man/src \
-       $RPM_BUILD_ROOT%{_appdir}/CHANGES \
-       $RPM_BUILD_ROOT%{_appdir}/COPYING \
-       $RPM_BUILD_ROOT%{_appdir}/INSTALL \
-       $RPM_BUILD_ROOT%{_appdir}/README \
-       $RPM_BUILD_ROOT%{_appdir}/VERSION
+cat > $RPM_BUILD_ROOT/etc/sysconfig/mysql-mmm-monitor <<EOF
+# mysql-mmm-monitor defaults
+ENABLED=1
+EOF
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post
-/sbin/chkconfig --add mmm_agent
-%service mmm_agent restart
-/sbin/chkconfig --add mmm_mon
-%service mmm_mon restart
+%post agent
+if [ "$1" -eq 1 ]; then
+	/sbin/chkconfig --add mysql-mmm-agent
+	/sbin/chkconfig mysql-mmm-agent off
+elif [ "$1" -ge 2 ]; then
+	%service mysql-mmm-agent condrestart
+fi
 
-%preun
-if [ "$1" = "0" ]; then
-	%service mmm_agent stop
-	/sbin/chkconfig --del mmm_agent
-	%service mmm_mon stop
-	/sbin/chkconfig --del mmm_mon
+%post monitor
+if [ "$1" -eq 1 ]; then
+	/sbin/chkconfig --add mysql-mmm-monitor
+	/sbin/chkconfig mysql-mmm-monitor off
+elif [ "$1" -ge 2 ]; then
+	%service mysql-mmm-monitor condrestart
+fi
+
+%preun agent
+if [ "$1" -eq 0 ]; then
+	%service mysql-mmm-agent stop
+	/sbin/chkconfig --del mysql-mmm-agent
+fi
+
+%preun monitor
+if [ "$1" -eq 0 ]; then
+	%service mysql-mmm-monitor stop
+	/sbin/chkconfig --del mysql-mmm-monitor
 fi
 
 %files
 %defattr(644,root,root,755)
-%doc CHANGES INSTALL README VERSION
-%config(noreplace) %verify(not md5 mtime size) /etc/logrotate.d/mmm
-%attr(754,root,root) /etc/rc.d/init.d/mmm_agent
-%attr(754,root,root) /etc/rc.d/init.d/mmm_mon
+%doc INSTALL README VERSION %{name}-%{version}.pdf
+%dir %{_sysconfdir}/mysql-mmm
+%config(noreplace) %verify(not md5 mtime size) /etc/logrotate.d/mysql-mmm
+%attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_common.conf
+%{perl_vendorlib}/MMM/Common
+
+%dir %{_localstatedir}/lib/mysql-mmm
+%dir %{_localstatedir}/run/mysql-mmm
+%dir %{_localstatedir}/log/mysql-mmm
+
+%files tools
+%defattr(644,root,root,755)
+%doc README
+%config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_tools.conf
 %attr(755,root,root) %{_sbindir}/mmm_backup
 %attr(755,root,root) %{_sbindir}/mmm_clone
-%attr(755,root,root) %{_sbindir}/mmm_control
-%attr(755,root,root) %{_sbindir}/mmm_get_dump
 %attr(755,root,root) %{_sbindir}/mmm_restore
-%attr(755,root,root) %{_sbindir}/mmmd_agent
-%attr(755,root,root) %{_sbindir}/mmmd_angel
-%attr(755,root,root) %{_sbindir}/mmmd_mon
-%{_mandir}/man1/mmm_backup.1*
-%{_mandir}/man1/mmm_clone.1*
-%{_mandir}/man1/mmm_control.1*
-%{_mandir}/man1/mmm_get_dump.1*
-%{_mandir}/man1/mmm_restore.1*
-%{_mandir}/man1/mmmd_agent.1*
-%{_mandir}/man1/mmmd_angel.1*
-%{_mandir}/man1/mmmd_mon.1*
+%{perl_vendorlib}/MMM/Tools
+%{_libdir}/%{name}/tools
 
-%dir %{_appdir}
-%{_appdir}/lib
-%dir %{_appdir}/sbin
-%attr(755,root,root) %{_appdir}/sbin/*
+%files agent
+%defattr(644,root,root,755)
+%doc README
+%attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_agent.conf
+%config(noreplace) %verify(not md5 mtime size) /etc/sysconfig/mysql-mmm-agent
+%attr(754,root,root) /etc/rc.d/init.d/mysql-mmm-agent
+%attr(755,root,root) %{_sbindir}/mmm_agentd
+%{perl_vendorlib}/MMM/Agent
+%{_libdir}/%{name}/agent
 
-%dir %{_appdir}/bin
-%dir %{_appdir}/bin/agent
-%dir %{_appdir}/bin/check
-%dir %{_appdir}/bin/lvm
-%dir %{_appdir}/bin/sys
-%attr(755,root,root) %{_appdir}/bin/agent/add_role
-%attr(755,root,root) %{_appdir}/bin/agent/check_role
-%attr(755,root,root) %{_appdir}/bin/agent/del_role
-%attr(755,root,root) %{_appdir}/bin/agent/set_active_master
-%attr(755,root,root) %{_appdir}/bin/agent/set_state
-%attr(755,root,root) %{_appdir}/bin/check/checker
-%attr(755,root,root) %{_appdir}/bin/check_ip
-%attr(755,root,root) %{_appdir}/bin/clear_ip
-%attr(755,root,root) %{_appdir}/bin/limit_run
-%attr(755,root,root) %{_appdir}/bin/lvm/create_snapshot
-%attr(755,root,root) %{_appdir}/bin/lvm/remove_snapshot
-%attr(755,root,root) %{_appdir}/bin/mysql_allow_write
-%attr(755,root,root) %{_appdir}/bin/mysql_deny_write
-%attr(755,root,root) %{_appdir}/bin/sync_with_master
-#%attr(755,root,root) %{_appdir}/bin/sys/fping
-#%attr(755,root,root) %{_appdir}/bin/sys/send_arp
-%attr(755,root,root) %{_appdir}/bin/turn_off_slave
-%attr(755,root,root) %{_appdir}/bin/turn_on_slave
-
-%{_examplesdir}/%{name}-%{version}
+%files monitor
+%defattr(644,root,root,755)
+%doc README
+%attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_mon.conf
+%attr(640,root,root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/mmm_mon_log.conf
+%config(noreplace) %verify(not md5 mtime size) /etc/sysconfig/mysql-mmm-monitor
+%attr(754,root,root) /etc/rc.d/init.d/mysql-mmm-monitor
+%attr(755,root,root) %{_sbindir}/mmm_mond
+%attr(755,root,root) %{_sbindir}/mmm_control
+%{perl_vendorlib}/MMM/Monitor
+%{_libdir}/%{name}/monitor
