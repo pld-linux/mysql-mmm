@@ -4,7 +4,7 @@
 Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
 Version:	2.2.1
-Release:	0.5
+Release:	0.6
 License:	GPL v2
 Group:		Applications/System
 URL:		http://www.mysql-mmm.org/
@@ -89,6 +89,10 @@ Full documentation can be found at:
 
     %{_docdir}/%{name}-%{version}/%{name}-%{version}.pdf
 EOF
+
+# you'll need this if you cp -a complete dir in source
+# cleanup backups after patching
+find '(' -name '*~' -o -name '*.orig' ')' -print0 | xargs -0 -r -l512 rm -f
 
 %install
 rm -rf $RPM_BUILD_ROOT
