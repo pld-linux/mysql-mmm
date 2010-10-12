@@ -44,6 +44,7 @@ Summary:	MMM Database Server Agent Daemon and Libraries
 Group:		Applications/System
 Requires:	%{name} = %{version}-%{release}
 Requires:	iproute2
+Requires:	perl-Algorithm-Diff >= 1.1902
 Requires:	perl-DBD-mysql
 Requires:	perl-Net-ARP >= 1.0.6
 Obsoletes:	mmm-agent
