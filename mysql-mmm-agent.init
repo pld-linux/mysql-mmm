@@ -82,7 +82,7 @@ start() {
 
 	checkconfig
 	msg_starting "MMM Agent Daemon"
-	daemon /usr/sbin/mysql-mmm-agent
+	daemon /usr/sbin/mmm_agentd
 	RETVAL=$?
 	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/mysql-mmm-agent
 }
