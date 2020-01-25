@@ -1,6 +1,5 @@
 # TODO
 # - implement clusters in pld way
-%include	/usr/lib/rpm/macros.perl
 Summary:	Multi-Master Replication Manager for MySQL
 Name:		mysql-mmm
 Version:	2.2.1
